@@ -14,6 +14,7 @@
   "webProject": {
     "userAccount": "User00123",
     "password": "321321",
+    "api": "/",
     "projectPath": "./webProject/xxxxx",
     "source_mp3": "/"
   },
