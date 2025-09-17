@@ -1,0 +1,25 @@
+{
+  "serverSettings": {
+    "enabled": true,
+    "port": 3000,
+    "host": "localhost",
+    "autoStart": true,
+    "hotReload": true,
+    "openBrowser": false,
+    "cors": {
+      "enabled": true,
+      "origins": ["http://localhost:*"]
+    }
+  },
+  "webProject": {
+    "userAccount": "User00123",
+    "password": "321321",
+    "projectPath": "./webProject/xxxxx",
+    "source_mp3": "/"
+  },
+  "deploy": {
+    "platform":"",
+    "userAccount": "User00123",
+    "password": "321321"
+  }
+}
