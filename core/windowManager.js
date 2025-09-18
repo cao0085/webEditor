@@ -91,6 +91,7 @@ class WindowManager {
                 }
             });
             this.updateViewBounds();
+            console.log(this.webContentsViewPool)
             console.log('All views initialized successfully');
         } catch (error) {
             console.error('❌ Views initialization failed:', error);

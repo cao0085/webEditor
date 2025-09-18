@@ -10,9 +10,9 @@ const SOURCE_TYPES = {
 const CONTENT_SOURCE = {
   SIDEBAR: {
     srcType: SOURCE_TYPES.LOCAL_HTML,
-    path: path.join(__dirname, 'testRender', 'sidebar.html'),
+    path: path.join(__dirname, 'sidebar', 'sidebar.html'),
     name: 'sidebar',
-    preload: path.join(__dirname, '..', 'preload.js'),
+    preload: path.join(__dirname, 'preload.js'),
     singleton: true
   },
   
