@@ -1,4 +1,4 @@
-const { app } = require('electron');
+const { app, ipcMain } = require('electron');
 const WindowManager = require('./core/windowManager');
 
 // Init
@@ -9,10 +9,27 @@ app.whenReady().then(() => {
   console.log('App is ready, creating main window...');
   try {
     windowManager.createMainWindow();
+    
+    // 設置 IPC 處理程序
+    setupIPC();
   } catch (error) {
     console.error('Error creating main window:', error);
   }
 });
+
+// 設置 IPC 通信
+function setupIPC() {
+  console.log('Setting up IPC handlers...');
+  
+  // 處理頁面切換請求
+  ipcMain.handle('switch-page', async (event, pageName) => {
+    console.log('IPC: Received switch-page request for:', pageName);
+    windowManager.loadContentPage(pageName);
+    return { success: true, page: pageName };
+  });
+  
+  console.log('IPC handlers set up successfully');
+}
 
 // 所有視窗關閉時的處理
 app.on('window-all-closed', () => {

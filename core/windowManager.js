@@ -5,9 +5,11 @@ const fs = require('fs');
 class WindowManager {
   constructor() {
     this.mainWindow = null;
-    this.currentView = null;
-    this.views = new Map(); // 儲存所有的 WebContentsView
+    this.sidebarView = null; // 側邊欄 view
+    this.contentView = null; // 內容區 view
+    this.contentViews = new Map(); // 儲存所有內容頁面的 WebContentsView
     this.currentPageName = null;
+    this.sidebarWidth = 200; // 側邊欄寬度
     console.log('🏗️ WindowManager constructed');
   }
 
@@ -21,14 +23,15 @@ class WindowManager {
         nodeIntegration: false,
         contextIsolation: true,
         enableRemoteModule: false,
+        preload: path.join(__dirname, '..', 'preload.js')
       },
       show: true  // 直接顯示視窗
     });
 
     console.log('🪟 BrowserWindow created and shown');
 
-    // 載入預設頁面
-    this.loadPage('page01.html');
+    // 初始化雙 view 架構
+    this.initializeViews();
 
     // 創建選單
     this.createMenu();
@@ -36,15 +39,49 @@ class WindowManager {
     this.mainWindow.on('closed', () => {
       console.log('🔒 Window closed');
       this.mainWindow = null;
-      this.currentView = null;
-      this.views.clear();
+      this.sidebarView = null;
+      this.contentView = null;
+      this.contentViews.clear();
       this.currentPageName = null;
     });
 
     return this.mainWindow;
   }
 
-  loadPage(filename) {
+  initializeViews() {
+    console.log('🔧 Initializing dual view architecture...');
+    
+    // 創建側邊欄 WebContentsView
+    this.sidebarView = new WebContentsView({
+      webPreferences: {
+        nodeIntegration: false,
+        contextIsolation: true,
+        preload: path.join(__dirname, '..', 'preload.js')
+      }
+    });
+
+    // 載入側邊欄 HTML
+    const sidebarPath = path.join(__dirname, 'testRender', 'sidebar.html');
+    this.sidebarView.webContents.loadFile(sidebarPath);
+
+    // 添加側邊欄到主視窗
+    this.mainWindow.contentView.addChildView(this.sidebarView);
+
+    // 載入預設內容頁面
+    this.loadContentPage('page01.html');
+
+    // 設置初始佈局
+    this.updateViewBounds();
+
+    // 監聽視窗大小改變
+    this.mainWindow.on('resize', () => {
+      this.updateViewBounds();
+    });
+
+    console.log('✅ Dual view architecture initialized');
+  }
+
+  loadContentPage(filename) {
     console.log(`📄 Loading page: ${filename}`);
     
     if (!this.mainWindow) {
@@ -68,27 +105,27 @@ class WindowManager {
       return;
     }
 
-    // 隱藏當前顯示的 view
-    if (this.currentView) {
-      console.log('👁️ Hiding current view');
-      this.currentView.setVisible(false);
+    // 隱藏當前顯示的內容 view
+    if (this.contentView) {
+      console.log('👁️ Hiding current content view');
+      this.contentView.setVisible(false);
     }
 
     // 檢查是否已經有這個頁面的 view
-    if (this.views.has(filename)) {
-      console.log('♻️ Reusing existing view for this page');
-      this.currentView = this.views.get(filename);
+    if (this.contentViews.has(filename)) {
+      console.log('♻️ Reusing existing content view for this page');
+      this.contentView = this.contentViews.get(filename);
       this.currentPageName = filename;
       
       // 顯示這個 view
-      this.currentView.setVisible(true);
+      this.contentView.setVisible(true);
       this.updateViewBounds();
       return;
     }
 
-    // 創建新的 WebContentsView
-    console.log('🆕 Creating new WebContentsView');
-    const newView = new WebContentsView({
+    // 創建新的內容 WebContentsView
+    console.log('🆕 Creating new content WebContentsView');
+    const newContentView = new WebContentsView({
       webPreferences: {
         nodeIntegration: false,
         contextIsolation: true,
@@ -96,39 +133,38 @@ class WindowManager {
     });
 
     // 監聽 WebContentsView 的載入事件
-    newView.webContents.once('did-finish-load', () => {
-      console.log('✅ WebContentsView finished loading');
+    newContentView.webContents.once('did-finish-load', () => {
+      console.log('✅ Content WebContentsView finished loading');
     });
 
-    newView.webContents.once('dom-ready', () => {
-      console.log('✅ WebContentsView DOM ready');
+    newContentView.webContents.once('dom-ready', () => {
+      console.log('✅ Content WebContentsView DOM ready');
     });
 
     // 將 view 添加到主視窗
-    console.log('➕ Adding view to main window');
-    this.mainWindow.contentView.addChildView(newView);
+    console.log('➕ Adding content view to main window');
+    this.mainWindow.contentView.addChildView(newContentView);
 
     // 設定 view 的邊界
-    this.currentView = newView;
+    this.contentView = newContentView;
     this.currentPageName = filename;
-    this.views.set(filename, newView);
+    this.contentViews.set(filename, newContentView);
     this.updateViewBounds();
 
     // 載入 HTML 檔案
     console.log(`📂 Loading HTML file: ${htmlPath}`);
-    newView.webContents.loadFile(htmlPath)
+    newContentView.webContents.loadFile(htmlPath)
       .then(() => {
         console.log('✅ HTML file loaded successfully');
       })
       .catch((error) => {
         console.error('❌ Error loading HTML file:', error);
       });
+  }
 
-    // 監聽視窗大小改變
-    this.mainWindow.removeAllListeners('resize');
-    this.mainWindow.on('resize', () => {
-      this.updateViewBounds();
-    });
+  // 保持向後兼容性的方法
+  loadPage(filename) {
+    this.loadContentPage(filename);
   }
 
   updateViewBounds() {
@@ -136,12 +172,32 @@ class WindowManager {
       const bounds = this.mainWindow.getContentBounds();
       console.log(`📏 Updating view bounds: ${bounds.width}x${bounds.height}`);
       
-      // 更新所有 view 的邊界
-      this.views.forEach((view) => {
-        view.setBounds({
+      // 設置側邊欄邊界
+      if (this.sidebarView) {
+        this.sidebarView.setBounds({
           x: 0,
           y: 0,
-          width: bounds.width,
+          width: this.sidebarWidth,
+          height: bounds.height
+        });
+      }
+      
+      // 設置內容區邊界
+      if (this.contentView) {
+        this.contentView.setBounds({
+          x: this.sidebarWidth,
+          y: 0,
+          width: bounds.width - this.sidebarWidth,
+          height: bounds.height
+        });
+      }
+      
+      // 更新所有內容 view 的邊界
+      this.contentViews.forEach((view) => {
+        view.setBounds({
+          x: this.sidebarWidth,
+          y: 0,
+          width: bounds.width - this.sidebarWidth,
           height: bounds.height
         });
       });
