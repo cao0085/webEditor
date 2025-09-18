@@ -1,208 +1,191 @@
-const { BrowserWindow, WebContentsView, Menu } = require('electron');
-const path = require('path');
 const fs = require('fs');
+const { BrowserWindow, WebContentsView, Menu } = require('electron');
+const { SOURCE_TYPES, CONTENT_SOURCE } = require('./sourceManager');
+
 
 class WindowManager {
-  constructor() {
-    this.mainWindow = null;
-    this.sidebarView = null; // 側邊欄 view
-    this.contentView = null; // 內容區 view
-    this.contentViews = new Map(); // 儲存所有內容頁面的 WebContentsView
-    this.currentPageName = null;
-    this.sidebarWidth = 200; // 側邊欄寬度
-    console.log('🏗️ WindowManager constructed');
-  }
 
-  createMainWindow() {
-    console.log('🪟 Creating main window...');
-    
-    this.mainWindow = new BrowserWindow({
-      width: 1200,
-      height: 800,
-      webPreferences: {
-        nodeIntegration: false,
-        contextIsolation: true,
-        enableRemoteModule: false,
-        preload: path.join(__dirname, '..', 'preload.js')
-      },
-      show: true  // 直接顯示視窗
-    });
-
-    console.log('🪟 BrowserWindow created and shown');
-
-    // 初始化雙 view 架構
-    this.initializeViews();
-
-    // 創建選單
-    this.createMenu();
-
-    this.mainWindow.on('closed', () => {
-      console.log('🔒 Window closed');
-      this.mainWindow = null;
-      this.sidebarView = null;
-      this.contentView = null;
-      this.contentViews.clear();
-      this.currentPageName = null;
-    });
-
-    return this.mainWindow;
-  }
-
-  initializeViews() {
-    console.log('🔧 Initializing dual view architecture...');
-    
-    // 創建側邊欄 WebContentsView
-    this.sidebarView = new WebContentsView({
-      webPreferences: {
-        nodeIntegration: false,
-        contextIsolation: true,
-        preload: path.join(__dirname, '..', 'preload.js')
-      }
-    });
-
-    // 載入側邊欄 HTML
-    const sidebarPath = path.join(__dirname, 'testRender', 'sidebar.html');
-    this.sidebarView.webContents.loadFile(sidebarPath);
-
-    // 添加側邊欄到主視窗
-    this.mainWindow.contentView.addChildView(this.sidebarView);
-
-    // 載入預設內容頁面
-    this.loadContentPage('page01.html');
-
-    // 設置初始佈局
-    this.updateViewBounds();
-
-    // 監聽視窗大小改變
-    this.mainWindow.on('resize', () => {
-      this.updateViewBounds();
-    });
-
-    console.log('✅ Dual view architecture initialized');
-  }
-
-  loadContentPage(filename) {
-    console.log(`📄 Loading page: ${filename}`);
-    
-    if (!this.mainWindow) {
-      console.error('❌ No main window available');
-      return;
+    constructor() {
+        this.mainWindow = null; // type BrowserWindow
+        this.mainWebContentsView = null;  // type WebContentsView
+        this.webContentsViewPool = new Map();   // 緩存已創建的 views
+        this.sidebarWidth = 200;
     }
 
-    // 檢查檔案是否存在
-    const htmlPath = path.join(__dirname, 'testRender', filename);
-    console.log(`🔍 Looking for HTML file at: ${htmlPath}`);
-    
-    if (!fs.existsSync(htmlPath)) {
-      console.error(`❌ HTML file not found: ${htmlPath}`);
-      return;
-    }
-    console.log('✅ HTML file exists');
+    createMainWindow() {
 
-    // 如果已經是當前頁面，不需要切換
-    if (this.currentPageName === filename) {
-      console.log('ℹ️ Already on this page, no need to switch');
-      return;
-    }
-
-    // 隱藏當前顯示的內容 view
-    if (this.contentView) {
-      console.log('👁️ Hiding current content view');
-      this.contentView.setVisible(false);
-    }
-
-    // 檢查是否已經有這個頁面的 view
-    if (this.contentViews.has(filename)) {
-      console.log('♻️ Reusing existing content view for this page');
-      this.contentView = this.contentViews.get(filename);
-      this.currentPageName = filename;
-      
-      // 顯示這個 view
-      this.contentView.setVisible(true);
-      this.updateViewBounds();
-      return;
-    }
-
-    // 創建新的內容 WebContentsView
-    console.log('🆕 Creating new content WebContentsView');
-    const newContentView = new WebContentsView({
-      webPreferences: {
-        nodeIntegration: false,
-        contextIsolation: true,
-      }
-    });
-
-    // 監聽 WebContentsView 的載入事件
-    newContentView.webContents.once('did-finish-load', () => {
-      console.log('✅ Content WebContentsView finished loading');
-    });
-
-    newContentView.webContents.once('dom-ready', () => {
-      console.log('✅ Content WebContentsView DOM ready');
-    });
-
-    // 將 view 添加到主視窗
-    console.log('➕ Adding content view to main window');
-    this.mainWindow.contentView.addChildView(newContentView);
-
-    // 設定 view 的邊界
-    this.contentView = newContentView;
-    this.currentPageName = filename;
-    this.contentViews.set(filename, newContentView);
-    this.updateViewBounds();
-
-    // 載入 HTML 檔案
-    console.log(`📂 Loading HTML file: ${htmlPath}`);
-    newContentView.webContents.loadFile(htmlPath)
-      .then(() => {
-        console.log('✅ HTML file loaded successfully');
-      })
-      .catch((error) => {
-        console.error('❌ Error loading HTML file:', error);
-      });
-  }
-
-  // 保持向後兼容性的方法
-  loadPage(filename) {
-    this.loadContentPage(filename);
-  }
-
-  updateViewBounds() {
-    if (this.mainWindow) {
-      const bounds = this.mainWindow.getContentBounds();
-      console.log(`📏 Updating view bounds: ${bounds.width}x${bounds.height}`);
-      
-      // 設置側邊欄邊界
-      if (this.sidebarView) {
-        this.sidebarView.setBounds({
-          x: 0,
-          y: 0,
-          width: this.sidebarWidth,
-          height: bounds.height
+        // CREATE MAIN PROCESS
+        console.log('Creating main window...');
+        this.mainWindow = new BrowserWindow({
+        width: 1200,
+        height: 800,
+        webPreferences: {
+            nodeIntegration: false, // 預設隔離作業系統
+            contextIsolation: true, // 預設隔離作業系統
+            enableRemoteModule: false,
+            preload: path.join(__dirname, '..', 'preload.js')
+        },
+        show: true
         });
-      }
-      
-      // 設置內容區邊界
-      if (this.contentView) {
-        this.contentView.setBounds({
-          x: this.sidebarWidth,
-          y: 0,
-          width: bounds.width - this.sidebarWidth,
-          height: bounds.height
+
+        // 監聽事件
+        this.mainWindow.on('resize', () => {
+            this.updateViewBounds();
         });
-      }
-      
-      // 更新所有內容 view 的邊界
-      this.contentViews.forEach((view) => {
-        view.setBounds({
-          x: this.sidebarWidth,
-          y: 0,
-          width: bounds.width - this.sidebarWidth,
-          height: bounds.height
+
+        this.mainWindow.on('closed', () => {
+            console.log('🔒 Window closed');
+            this.mainWindow = null;
+            this.mainWebContentsView = null;
+            this.webContentsViewPool.clear();
         });
-      });
+        
+        // CREATE RENDERER PROCESS
+        const viewConfigs = [
+            { key: 'SIDEBAR', instanceId: 'default', show: true },
+            { key: 'EDITOR', instanceId: 'main', show: true },
+            { key: 'PREVIEWER', instanceId: 'preview1', show: false },
+            { key: 'PREVIEWER', instanceId: 'preview2', show: false }
+        ];
+
+        this.initializeViewsAsync(viewConfigs) // (不阻塞)
+
+        // 創建選單
+        this.createMenu();
+        return this.mainWindow;
     }
-  }
+
+    async initializeViewsAsync(viewConfigs) {
+        try {
+            // 檢查 showsViews 是否都在 renderKeys 中
+            const results = await Promise.all(
+                viewConfigs.map(config => 
+                    this.ensureWebContentView(config.key, config.instanceId)
+                )
+            );
+
+            if (!results.every(view => view !== null)) {
+                throw new Error('Some views failed to load');
+            }
+
+            // 處理要顯示的 views
+            viewConfigs.forEach((config, index) => {
+                if (config.show && results[index]) {
+                    const view = results[index];
+                    this.mainWindow.contentView.addChildView(view);
+                    view.setVisible(true);
+                    if (config.key === 'EDITOR' && config.instanceId === 'main') {
+                        this.mainWebContentsView = view;
+                    }
+                }
+            });
+
+            this.updateViewBounds();
+            console.log('All views initialized successfully');
+        } catch (error) {
+            console.error('❌ Views initialization failed:', error);
+        }
+    }
+
+    // 確保該 KEY 有對應 WebContentsView
+    async ensureWebContentView(contentKey, instanceId = 'default') {
+
+        if (!(contentKey in CONTENT_SOURCE)) {
+            console.log(`UnDefine content: ${contentKey}`);
+            return null;
+        }
+
+        // 檢查是否已存在 
+        const {srcType, path, preload, singleton} = CONTENT_SOURCE[contentKey];
+        const poolKey = singleton ? contentKey : `${contentKey}_${instanceId}`;
+        if (this.webContentsViewPool.has(poolKey)) {
+            console.log(`Reusing existing view: ${poolKey}`);
+            return this.webContentsViewPool.get(poolKey);
+        }
+
+        // 創建新的 WebContentsView
+        const newContentsView = new WebContentsView({
+            webPreferences: {
+                nodeIntegration: false,
+                contextIsolation: true,
+                preload: preload || undefined
+            }
+        });
+
+        newContentsView.webContents.once('did-finish-load', () => {
+            console.log('Content WebContentsView finished loading');
+        });
+
+        newContentsView.webContents.once('dom-ready', () => {
+            console.log('Content WebContentsView DOM ready');
+        });
+
+        try {
+            switch (srcType) {
+                case 'local_html':
+                    await newContentsView.webContents.loadFile(path);
+                    break;
+                case 'server_url':
+                case 'remote_url':
+                    await newContentsView.webContents.loadURL(path);
+                    break;
+                case 'embedded':
+                    break;
+                default:
+                throw new Error(`Unknown source type: ${srcType}`);
+            }
+
+            newContentsView.setVisible(false);
+            this.webContentsViewPool.set(poolKey, newContentsView); // 用傳入的KEY當作
+            return newContentsView;
+
+        } catch (error) {
+            console.error(`Failed to load ${poolKey}:`, error);
+            return null;
+        }
+    }
+
+    // 保持向後兼容性的方法
+    loadPage(filename) {
+        this.loadMainContentView(filename);
+    }
+
+    updateViewBounds() {
+        if (this.mainWindow) {
+        const bounds = this.mainWindow.getContentBounds();
+        console.log(`📏 Updating view bounds: ${bounds.width}x${bounds.height}`);
+        
+        // 設置側邊欄邊界
+        if (this.sidebarView) {
+            this.sidebarView.setBounds({
+                x: 0,
+                y: 0,
+                width: this.sidebarWidth,
+                height: bounds.height
+            });
+        }
+        
+        // 設置內容區邊界
+        if (this.contentView) {
+            this.contentView.setBounds({
+            x: this.sidebarWidth,
+            y: 0,
+            width: bounds.width - this.sidebarWidth,
+            height: bounds.height
+            });
+        }
+        
+        // 更新所有內容 view 的邊界
+        this.contentViews.forEach((view) => {
+            view.setBounds({
+                x: this.sidebarWidth,
+                y: 0,
+                width: bounds.width - this.sidebarWidth,
+                height: bounds.height
+            });
+        });
+        }
+    }
 
   createMenu() {
     console.log('📋 Creating menu');
