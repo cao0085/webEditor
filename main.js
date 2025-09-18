@@ -6,7 +6,7 @@ const windowManager = new WindowManager();
 const WebContentsView_Configs = [
     { key: 'SIDEBAR', instanceId: 'default', show: true },
     { key: 'EDITOR', instanceId: 'main', show: true },
-    { key: 'PREVIEWER', instanceId: 'default', show: true },
+    { key: 'PREVIEWER', instanceId: 'default', show: false },
 ];
 
 // 應用程式準備就緒時創建視窗

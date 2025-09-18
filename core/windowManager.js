@@ -1,6 +1,6 @@
 const fs = require('fs');
 const path = require('path');
-const { BrowserWindow, WebContentsView, Menu } = require('electron');
+const { BrowserWindow, WebContentsView, Menu, ipcMain } = require('electron');
 const { CONTENT_SOURCE } = require('./sourceManager');
 
 
@@ -44,6 +44,9 @@ class WindowManager {
         // 監聽滑鼠事件用於側邊欄寬度調整
         this.setupSidebarResizing();
 
+        // 設置 IPC 監聽器
+        this.setupIPCListeners();
+
         this.mainWindow.on('closed', () => {
             console.log('🔒 Window closed');
             this.mainWindow = null;
@@ -71,16 +74,18 @@ class WindowManager {
                 throw new Error('Some views failed to load');
             }
 
-            // 處理要顯示的 views
+            // 處理所有 views - 全部添加到窗口但根據 show 設置可見性
             viewConfigs.forEach((config, index) => {
-                if (config.show && results[index]) {
+                if (results[index]) {
                     const view = results[index];
                     this.mainWindow.contentView.addChildView(view);
-                    view.setVisible(true);
+                    view.setVisible(config.show); // 根據 config.show 設置可見性
                     console.log(view);
+
+                    // 設置狀態引用
                     if (config.key === 'SIDEBAR') {
                         this.viewState.sidebar = view;
-                    }else if (config.key === 'EDITOR' && config.instanceId === 'main') {
+                    } else if (config.key === 'EDITOR' && config.instanceId === 'main') {
                         this.viewState.current = view;
                     }
                 }
@@ -131,7 +136,6 @@ class WindowManager {
         const {srcType, path, preload, singleton} = CONTENT_SOURCE[contentKey];
         const poolKey = singleton ? contentKey : `${contentKey}_${instanceId}`;
         if (this.webContentsViewPool.has(poolKey)) {
-            console.log(`Reusing existing view: ${poolKey}`);
             return this.webContentsViewPool.get(poolKey);
         }
 
@@ -180,6 +184,19 @@ class WindowManager {
         // 設置滑鼠事件監聽器用於調整側邊欄寬度
         this.mainWindow.webContents.on('before-input-event', (event, input) => {
             // 這裡可以處理快捷鍵調整側邊欄寬度
+        });
+    }
+
+    setupIPCListeners() {
+        // 處理來自 renderer 進程的側邊欄調整請求
+        ipcMain.handle('resize-sidebar', (event, newWidth) => {
+            this.setSidebarWidth(newWidth);
+            return this.getSidebarWidth(); // 返回實際設置的寬度
+        });
+
+        // 獲取當前側邊欄寬度
+        ipcMain.handle('get-sidebar-width', () => {
+            return this.getSidebarWidth();
         });
     }
 
@@ -259,6 +276,38 @@ class WindowManager {
                 if (this.mainWindow) {
                   this.mainWindow.close();
                 }
+              }
+            }
+          ]
+        },
+        {
+          label: '視圖',
+          submenu: [
+            {
+              label: '切換側邊欄',
+              accelerator: 'Ctrl+B',
+              click: () => {
+                this.toggleSidebar();
+              }
+            },
+            {
+              label: '增加側邊欄寬度',
+              accelerator: 'Ctrl+Shift+=',
+              click: () => {
+                this.setSidebarWidth(this.sidebarWidth + 20);
+              }
+            },
+            {
+              label: '減少側邊欄寬度',
+              accelerator: 'Ctrl+Shift+-',
+              click: () => {
+                this.setSidebarWidth(this.sidebarWidth - 20);
+              }
+            },
+            {
+              label: '重置側邊欄寬度',
+              click: () => {
+                this.setSidebarWidth(200);
               }
             }
           ]
