@@ -128,9 +128,12 @@ class WindowManager {
     // 確保該 KEY 有對應 WebContentsView
     async ensureWebContentView(contentKey, instanceId = 'default') {
 
-        if (!(contentKey in CONTENT_SOURCE)) {
-            console.log(`UnDefine content: ${contentKey}`);
-            return null;
+        // if (!(contentKey in CONTENT_SOURCE)) {
+        //     console.log(`UnDefine content: ${contentKey}`);
+        //     return null;
+        // }
+        if (this.webContentsViewPool.has(contentKey)) {
+            return this.webContentsViewPool.get(contentKey);
         }
 
         // 檢查是否已存在 
