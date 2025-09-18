@@ -3,12 +3,17 @@ const WindowManager = require('./core/windowManager');
 
 // Init
 const windowManager = new WindowManager();
+const WebContentsView_Configs = [
+    { key: 'SIDEBAR', instanceId: 'default', show: true },
+    { key: 'EDITOR', instanceId: 'main', show: true },
+    { key: 'PREVIEWER', instanceId: 'default', show: true },
+];
 
 // 應用程式準備就緒時創建視窗
 app.whenReady().then(() => {
   console.log('App is ready, creating main window...');
   try {
-    windowManager.createMainWindow();
+    windowManager.createMainWindow(WebContentsView_Configs);
     
     // 設置 IPC 處理程序
     setupIPC();
@@ -24,7 +29,8 @@ function setupIPC() {
   // 處理頁面切換請求
   ipcMain.handle('switch-page', async (event, pageName) => {
     console.log('IPC: Received switch-page request for:', pageName);
-    windowManager.loadContentPage(pageName);
+    const targetViewer = await windowManager.ensureWebContentView(pageName);
+    windowManager.switchToView(targetViewer);
     return { success: true, page: pageName };
   });
   
