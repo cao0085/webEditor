@@ -7,9 +7,12 @@ contextBridge.exposeInMainWorld('electronAPI', {
     return ipcRenderer.invoke('load-config');
   },
 
-  switchView: (poolKey) => {
-    console.log('Preload: Switching to view:', poolKey);
-    ipcRenderer.invoke('switch-page', poolKey);
+  onSidebarUpdate: (callback) => {
+      ipcRenderer.on('sidebar-update', (event, data) => callback(data));
+  },
+
+  switchView: (webContentsID) => {
+    return ipcRenderer.invoke('switch-view', webContentsID);
   },
 
   resizeSidebar: (newWidth) => {

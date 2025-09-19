@@ -19,3 +19,8 @@ Electron 應用有兩種進程：
 安全性考量：
 - Renderer Process 運行在沙盒環境中，不能直接訪問 Node.js API
 - 需要通過 IPC 與 Main Process 通信來執行特權操作
+
+
+
+WebContentView
+有提供辨識屬性 contentsView.webContents.id

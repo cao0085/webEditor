@@ -1,13 +1,19 @@
 const path = require('path');
 
 const SOURCE_TYPES = {
-  LOCAL_HTML: 'local_html',
+  LOCAL_HTML: 'html',
   REMOTE_URL: 'remote_url', 
   SERVER_URL: 'server_url',
   EMBEDDED: 'embedded'
 };
 
-const CONTENT_SOURCE = {
+const LAYOUT_MODE = {
+  SIDEBAR_WITH_MAIN: 'sidebar_with_main',
+  FULLSCREEN_SINGLE: 'fullscreen_single',
+  POPUP_OVERLAY: 'popup_overlay'
+};
+
+const WEBVIEW_SOURCE = {
   SIDEBAR: {
     srcType: SOURCE_TYPES.LOCAL_HTML,
     path: path.join(__dirname, 'sidebar', 'sidebar.html'),
@@ -52,6 +58,7 @@ const CONTENT_SOURCE = {
 };
 
 module.exports = {
+  LAYOUT_MODE,
   SOURCE_TYPES,
-  CONTENT_SOURCE
+  WEBVIEW_SOURCE
 };

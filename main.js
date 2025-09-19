@@ -1,21 +1,23 @@
 const { app, ipcMain } = require('electron');
 const WindowManager = require('./core/windowManager');
-const windowManager = new WindowManager();
-const { WebContentsView_Config } = require('./client.config.js');
+const { WCV_DEFAULT_SETTING } = require('./client.config.js');
+const { registerAllIPC } = require('./core/ipc-registry.js');
 
-// Init
-// 應用程式準備就緒時創建視窗
-app.whenReady().then(() => {
+let windowManager = null;
+
+app.whenReady().then(async () => {
   console.log('App is ready, creating main window...');
   try {
-    windowManager.createMainWindow(WebContentsView_Config);
-    setupIPC(); // 設置 IPC 處理程序
+    windowManager = new WindowManager();
+    const ipcUtils = registerAllIPC(windowManager);
+    await windowManager.initialize(WCV_DEFAULT_SETTING);
+    console.log('Application initialized successfully');
   } catch (error) {
     console.error('Error creating main window:', error);
+    app.quit();
   }
 });
 
-// 所有視窗關閉時的處理
 app.on('window-all-closed', () => {
   console.log('All windows closed');
   if (process.platform !== 'darwin') {
@@ -23,7 +25,6 @@ app.on('window-all-closed', () => {
   }
 });
 
-// macOS：點擊 dock 圖標時重新創建視窗
 app.on('activate', () => {
   console.log('🎯 App activated');
   if (!windowManager.getMainWindow()) {
@@ -35,31 +36,6 @@ app.on('activate', () => {
 app.on('before-quit', () => {
   windowManager.closeAllWindows();
 });
-
-function setupIPC() {
-  console.log('Setting up IPC handlers...');
-  
-  // 處理頁面切換請求
-  ipcMain.handle('switch-page', async (event, pageName) => {
-    console.log('IPC: Received switch-page request for:', pageName);
-    const targetViewer = await windowManager.ensureWebContentView(pageName);
-    windowManager.switchToView(targetViewer);
-    return { success: true, page: pageName };
-  });
-
-  // 如果需要將配置傳給渲染進程
-  ipcMain.handle('load-config', async () => {
-    return {
-      WebContentsView_Config
-    };
-  });
-  
-  console.log('IPC handlers set up successfully');
-}
-
-
-
-
 
 // 錯誤處理
 process.on('uncaughtException', (error) => {
