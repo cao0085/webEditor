@@ -8,7 +8,7 @@ contextBridge.exposeInMainWorld('electronAPI', {
   },
 
   onSidebarUpdate: (callback) => {
-      ipcRenderer.on('sidebar-update', (event, data) => callback(data));
+    ipcRenderer.on('update-sidebar', (event, data) => callback(data));
   },
 
   switchView: (webContentsID) => {

@@ -1,14 +1,20 @@
 const WCV_DEFAULT_SETTING = {
 
   panels: {
-    'sidebar-1': { type: 'SIDEBAR', name: '側邊攔' },
+    'sidebar': { type: 'SIDEBAR', name: '側邊攔' },
     'editor-1': { type: 'EDITOR', name: '編輯器' },
     'previewer-1': { type: 'PREVIEWER', name: '預覽1' },
-    'previewer-2': { type: 'PREVIEWER', name: '預覽2' },
-    'previewer-3': { type: 'PREVIEWER', name: '測試在mean' },
   },
+  
+  initial: ['sidebar', 'editor-1', 'previewer-1'],
 
-  initial: ['sidebar-1', 'editor-1', 'previewer-1', 'previewer-2', 'previewer-3'],
+  defaultView: {
+    layoutMode: 'sidebar_with_main',
+    sidebar: 'sidebar',
+    main: 'editor-1',
+    fullScreen: null,
+    overlay: null
+  },
 
   triggers: {
     inSidebar: ['editor-1', 'previewer-1', 'previewer-2'],

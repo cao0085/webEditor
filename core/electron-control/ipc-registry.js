@@ -13,7 +13,7 @@ function registerAllIPC(windowManager) {
       }
       
       // 或者直接載入配置檔案
-      const config = require('../client.config'); // 根據你的配置檔案路徑調整
+      const config = require('../../client.config'); // 根據你的配置檔案路徑調整
       return config;
     } catch (error) {
       console.error('載入配置失敗:', error);

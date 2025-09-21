@@ -2,7 +2,7 @@ const fs = require('fs');
 const path = require('path');
 const { BrowserWindow, WebContentsView, Menu, ipcMain } = require('electron');
 const { LAYOUT_MODE } = require('./sourceBridage');
-const { createWCV, isAvailableToCreateWC, getValidWebContents } = require('./viewController/webViewLifecycle');
+const { createWCV, isAvailableToCreateWC, getValidWebContents, getValidWebContentsView, getAllWCView } = require('./electron-control/webViewLifecycle');
 
 
 class WindowManager {
@@ -16,14 +16,6 @@ class WindowManager {
       sideWithMain: {sidebar:null,main:null},
       fullScreen: null,
       overlay: null
-    };
-    
-    this.webContentsViewPool = new Map();   // 緩存已創建的 views
-    this.viewState = {
-        sidebar: null,
-        current: null, // poolKey
-        previous: null,
-        history: []
     };
     this.sidebarWidth = 200;
     this.minSidebarWidth = 150;
@@ -46,11 +38,12 @@ class WindowManager {
 
     loadPromise.then(() => {
       this.#createCompleteMenu();
+      console.log(getAllWCView())
       console.log('All views loaded and menu finalized');
     }).catch(error => {
       console.error('Error loading views:', error);
     });
-
+    
     this._isInitialized = true;
     return this.mainWindow;
   }
@@ -65,7 +58,7 @@ class WindowManager {
         nodeIntegration: false,
         contextIsolation: true,
         enableRemoteModule: false,
-        preload: path.join(__dirname, '..', 'preload.js')
+        preload: path.join(__dirname, 'electron-control', 'preload.js')
       },
       show: true
     });
@@ -167,7 +160,7 @@ class WindowManager {
   }
 
   async #initializeViewsAsync(configSetting) {
-    const { panels, initial, triggers } = configSetting;
+    const { panels, initial, defaultView, triggers } = configSetting;
     const { inSidebar, inMenu } = triggers;
 
     for (const str of initial) {
@@ -182,27 +175,55 @@ class WindowManager {
         } else if (inMenu.includes(str)) {
           this.inWindowMenuWVC.set(name, webContentsId);
         }
+
+        switch (str) {
+          case defaultView.sidebar:
+            this.currentView.sideWithMain.sidebar = view
+            view.setVisible(true)
+            break;
+          case defaultView.main:
+            this.currentView.sideWithMain.main = view
+            view.setVisible(true)
+            break;
+          case defaultView.main:
+            this.currentView.sideWithMain.fullScreen = view
+            view.setVisible(true)
+            break;
+          case defaultView.main:
+            this.currentView.sideWithMain.overlay = view
+            view.setVisible(true)
+            break;
+          default:
+            console.log("not default view", view)
+            break
+        };
       }
     }
-
     this.updateViewBounds();
+
+    // 延遲執行確保 sidebar view 已經完全載入
+    setTimeout(() => {
+      this.notifySidebarUpdate();
+    }, 500);
   }
   // #endregion
 
   //#region 外部調用
   switchMainWCV(webContentID) {
-    console.log("switch to __",webContentID)
+    console.log("switch to ID:",webContentID)
 
     if (this.showingWCV.has(webContentID)) {
       console.log("Already showing", webContentID);
       return;
     }
 
-    const webContent = getValidWebContents(webContentID);
-    if (!webContent) {
+    const webContentView = getValidWebContentsView(webContentID);
+    if (!webContentView) {
       console.error("Invalid webContentID:", webContentID);
       return;
     }
+
+    console.log(webContentView)
 
     // 根據 LAYOUT 判斷要替換的 WVC
     const {SIDEBAR_WITH_MAIN, FULLSCREEN_SINGLE, POPUP_OVERLAY} = LAYOUT_MODE;
@@ -215,11 +236,11 @@ class WindowManager {
         this.currentView.fullScreen?.setVisible(false);
         this.currentView.overlay?.setVisible(false);
 
-        webContent.setVisible(true);
+        webContentView.setVisible(true);
         this.currentView.sideWithMain?.sidebar?.setVisible(true);
-        
+
         if (this.currentView.sideWithMain) {
-          this.currentView.sideWithMain.main = webContent;
+          this.currentView.sideWithMain.main = webContentView;
         }
         break;
       
@@ -229,8 +250,8 @@ class WindowManager {
         this.currentView.fullScreen?.setVisible(false);
         this.currentView.overlay?.setVisible(false);
 
-        webContent.setVisible(true);
-        this.currentView.fullScreen = webContent;
+        webContentView.setVisible(true);
+        this.currentView.fullScreen = webContentView;
         break;
         
       case POPUP_OVERLAY:
@@ -260,6 +281,9 @@ class WindowManager {
     
     const sidebarView = this.currentView.sideWithMain?.sidebar;
     if (sidebarView && sidebarView.webContents) {
+      console.log("seeeddedededededede================================")
+      console.log(data)
+      console.log("seeeddedededededede================================")
       sidebarView.webContents.send('update-sidebar', data);
     }
   }
@@ -290,6 +314,10 @@ class WindowManager {
       });
   }
 
+  resizeSidebar(newWidth) {
+    this.setSidebarWidth(newWidth);
+  }
+
   setSidebarWidth(newWidth) {
     this.sidebarWidth = Math.max(
         this.minSidebarWidth,
@@ -299,6 +327,7 @@ class WindowManager {
   }
 
   updateViewBounds() {
+      console.error("updateViewBounds",this.currentView)
       if (!this.mainWindow) return;
 
       const bounds = this.mainWindow.getContentBounds();
@@ -310,8 +339,8 @@ class WindowManager {
       }
 
       // 設置側邊欄邊界
-      if (this.viewState.sidebar) {
-          this.viewState.sidebar.setBounds({
+      if (this.currentView.sideWithMain.sidebar) {
+          this.currentView.sideWithMain.sidebar.setBounds({
               x: 0,
               y: 0,
               width: this.sidebarWidth,
@@ -320,26 +349,14 @@ class WindowManager {
       }
 
       // 設置當前內容區邊界
-      if (this.viewState.current) {
-          this.viewState.current.setBounds({
+      if (this.currentView.sideWithMain.main) {
+          this.currentView.sideWithMain.main.setBounds({
               x: this.sidebarWidth,
               y: 0,
               width: bounds.width - this.sidebarWidth,
               height: bounds.height
           });
       }
-
-      // 更新所有在池中但未顯示的 views 的邊界，以備切換時使用
-      this.webContentsViewPool.forEach((view, key) => {
-          if (view !== this.viewState.sidebar && view !== this.viewState.current) {
-              view.setBounds({
-                  x: this.sidebarWidth,
-                  y: 0,
-                  width: bounds.width - this.sidebarWidth,
-                  height: bounds.height
-              });
-          }
-      });
     }
 
 
@@ -363,7 +380,7 @@ class WindowManager {
         if (isVisible) {
           this.setSidebarWidth(0);
         } else {
-          this.setSidebarWidth(200); // 恢復默認寬度
+          this.setSidebarWidth(200);
         }
       }
     }

@@ -1,7 +1,7 @@
 const { app, ipcMain } = require('electron');
 const WindowManager = require('./core/windowManager');
 const { WCV_DEFAULT_SETTING } = require('./client.config.js');
-const { registerAllIPC } = require('./core/ipc-registry.js');
+const { registerAllIPC } = require('./core/electron-control/ipc-registry.js');
 
 let windowManager = null;
 

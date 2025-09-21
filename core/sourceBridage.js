@@ -18,13 +18,13 @@ const WEBVIEW_SOURCE = {
     srcType: SOURCE_TYPES.LOCAL_HTML,
     path: path.join(__dirname, 'sidebar', 'sidebar.html'),
     name: 'sidebar',
-    preload: path.join(__dirname, 'preload.js'),
+    preload: path.join(__dirname, 'electron-control', 'preload.js'),
     singleton: true
   },
   
   EDITOR: {
     srcType: SOURCE_TYPES.LOCAL_HTML,
-    path: path.join(__dirname, 'testRender', 'page01.html'),
+    path: path.join(__dirname, 'editor', 'editor.html'),
     name: 'editor',
     preload: undefined,
     singleton: true
@@ -32,7 +32,7 @@ const WEBVIEW_SOURCE = {
   
   PREVIEWER: {
     srcType: SOURCE_TYPES.LOCAL_HTML,
-    path: path.join(__dirname, 'testRender', 'page02.html'),
+    path: path.join(__dirname, 'previewer', 'previewer.html'),
     name: 'previewer',
     preload: undefined,
     singleton: false

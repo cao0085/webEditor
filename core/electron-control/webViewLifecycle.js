@@ -29,9 +29,8 @@ async function createWCV(viewType, isIntegration = false, isIsolation= true) {
   // SOURCE_TYPES
   const {LOCAL_HTML, REMOTE_URL, SERVER_URL, EMBEDDED} = SOURCE_TYPES
   const srcPath = viewConfig.path;
-  const srcType = viewConfig.sourceType;
+  const srcType = viewConfig.srcType;
   const isSingleton = viewConfig.singleton || false;
-
   switch (srcType) {
     case LOCAL_HTML:
       await contentsView.webContents.loadFile(srcPath);
@@ -74,32 +73,63 @@ function isAvailableToCreateWC(viewType) {
   return true;
 }
 
-function isWebContentsValid(webContentID) {
-  try {
-    const wc = webContents.fromId(webContentID);
-    return wc && !wc.isDestroyed();
-  } catch (error) {
-    return false;
-  }
-}
-
 function getValidWebContents(webContentID) {
   try {
     const wc = webContents.fromId(webContentID);
     return (wc && !wc.isDestroyed()) ? wc : null;
   } catch (error) {
+    console.log("can't find")
+    return null;
+  }
+}
+
+function getValidWebContentsView(webContentID) {
+  try {
+    const wc = webContents.fromId(webContentID);
+    if (!wc || wc.isDestroyed()) {
+      return null;
+    }
+
+    // 從 webContents 找到對應的 WebContentsView
+    // 注意：這需要遍歷主窗口的所有子視圖
+    const { BrowserWindow } = require('electron');
+    const mainWindow = BrowserWindow.getAllWindows()[0]; // 假設只有一個主窗口
+
+    if (!mainWindow || !mainWindow.contentView) {
+      return null;
+    }
+
+    // 遞歸搜尋所有子視圖
+    function findViewByWebContents(view, targetWebContents) {
+      if (view.webContents && view.webContents.id === targetWebContents.id) {
+        return view;
+      }
+
+      // 搜尋子視圖
+      const children = view.children || [];
+      for (const child of children) {
+        const found = findViewByWebContents(child, targetWebContents);
+        if (found) return found;
+      }
+
+      return null;
+    }
+
+    return findViewByWebContents(mainWindow.contentView, wc);
+  } catch (error) {
+    console.error("Error finding WebContentsView:", error);
     return null;
   }
 }
 
 async function getAllWCView() {
-  webContents.getAllWebContents()
+  return webContents.getAllWebContents()
 }
 
 module.exports = {
   createWCV,
-  isWebContentsValid,
   isAvailableToCreateWC,
   getValidWebContents,
+  getValidWebContentsView,
   getAllWCView
 };
