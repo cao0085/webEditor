@@ -1,7 +1,7 @@
 const fs = require('fs');
 const path = require('path');
 const { BrowserWindow, WebContentsView, Menu, ipcMain } = require('electron');
-const { LAYOUT_MODE } = require('./sourceBridage');
+const { PRELOAD_PATH, LAYOUT_MODE } = require('./sourceBridage');
 const { createWCV, isAvailableToCreateWC, getValidWebContents, getValidWebContentsView, getAllWCView } = require('./electron-control/webViewLifecycle');
 
 
@@ -17,15 +17,18 @@ class WindowManager {
       fullScreen: null,
       overlay: null
     };
-    this.sidebarWidth = 200;
-    this.minSidebarWidth = 150;
-    this.maxSidebarWidth = 400;
-    this.isResizing = false;
+
+    this.sidebarWidth = {
+      current: 200,
+      min: 150,
+      max: 400,
+      isResizing: false,
+    }
 
     this._isInitialized = false;
   }
 
-  // 外部調用的入口
+  // 主邏輯
   async initialize(viewConfigs) {
     if (this._isInitialized) {
       console.warn('WindowManager already initialized');
@@ -48,7 +51,13 @@ class WindowManager {
     return this.mainWindow;
   }
 
-  //#region 初始化方法
+  closeAllWindows() {
+    if (this.mainWindow) {
+      this.mainWindow.close();
+    }
+  }
+
+  //#region 私有初始化方法
   #createWindowFrame() {
     console.log('Creating window frame...');
     this.mainWindow = new BrowserWindow({
@@ -58,18 +67,12 @@ class WindowManager {
         nodeIntegration: false,
         contextIsolation: true,
         enableRemoteModule: false,
-        preload: path.join(__dirname, 'electron-control', 'preload.js')
+        preload: PRELOAD_PATH
       },
       show: true
     });
 
     // 設置基本事件監聽
-    this.#setupEventListeners();
-    
-    return this.mainWindow; // 返回創建的窗口
-  }
-
-  #setupEventListeners() {
     this.mainWindow.on('resize', () => {
       this.updateViewBounds();
     });
@@ -78,6 +81,8 @@ class WindowManager {
       console.log('🔒 Window closed');
       // this.#cleanup();
     });
+    
+    return this.mainWindow; // 返回創建的窗口
   }
 
   #createEmptyMenu() {
@@ -206,24 +211,21 @@ class WindowManager {
       this.notifySidebarUpdate();
     }, 500);
   }
-  // #endregion
+  //#endregion
 
   //#region 外部調用
   switchMainWCV(webContentID) {
-    console.log("switch to ID:",webContentID)
 
     if (this.showingWCV.has(webContentID)) {
       console.log("Already showing", webContentID);
-      return;
+      return false;
     }
 
     const webContentView = getValidWebContentsView(webContentID);
     if (!webContentView) {
       console.error("Invalid webContentID:", webContentID);
-      return;
+      return false;
     }
-
-    console.log(webContentView)
 
     // 根據 LAYOUT 判斷要替換的 WVC
     const {SIDEBAR_WITH_MAIN, FULLSCREEN_SINGLE, POPUP_OVERLAY} = LAYOUT_MODE;
@@ -263,15 +265,7 @@ class WindowManager {
     }
 
     this.updateViewBounds();
-  }
-
-  getInSidebarWVC() {
-    return this.inSidebarWVC
-  }
-
-  getSidebarWVCList() {
-    const id = this.inSidebarWVC.get(name);
-    return id ? webContents.fromId(id) : null;
+    return true;
   }
 
   notifySidebarUpdate() {
@@ -281,115 +275,62 @@ class WindowManager {
     
     const sidebarView = this.currentView.sideWithMain?.sidebar;
     if (sidebarView && sidebarView.webContents) {
-      console.log("seeeddedededededede================================")
-      console.log(data)
-      console.log("seeeddedededededede================================")
       sidebarView.webContents.send('update-sidebar', data);
     }
   }
-
-  getMenuView(name) {
-    const id = this.inWindowMenuWVC.get(name);
-    return id ? webContents.fromId(id) : null;
-  }
   // #endregion
 
-  setupSidebarResizing() {
-    // 設置滑鼠事件監聽器用於調整側邊欄寬度
-    this.mainWindow.webContents.on('before-input-event', (event, input) => {
-        // 這裡可以處理快捷鍵調整側邊欄寬度
-    });
-  }
-
-  setupIPCListeners() {
-      // 處理來自 renderer 進程的側邊欄調整請求
-      ipcMain.handle('resize-sidebar', (event, newWidth) => {
-          this.setSidebarWidth(newWidth);
-          return this.getSidebarWidth(); // 返回實際設置的寬度
-      });
-
-      // 獲取當前側邊欄寬度
-      ipcMain.handle('get-sidebar-width', () => {
-          return this.getSidebarWidth();
-      });
-  }
-
+  //#region 調整尺寸
   resizeSidebar(newWidth) {
-    this.setSidebarWidth(newWidth);
-  }
-
-  setSidebarWidth(newWidth) {
-    this.sidebarWidth = Math.max(
-        this.minSidebarWidth,
-        Math.min(this.maxSidebarWidth, newWidth)
+    this.sidebarWidth.current = Math.max(
+      this.sidebarWidth.min,
+      Math.min(this.sidebarWidth.max, newWidth)
     );
     this.updateViewBounds();
   }
 
   updateViewBounds() {
-      console.error("updateViewBounds",this.currentView)
-      if (!this.mainWindow) return;
 
-      const bounds = this.mainWindow.getContentBounds();
+    if (!this.mainWindow) return;
+    const bounds = this.mainWindow.getContentBounds();
 
-      // 確保側邊欄寬度不超過窗口寬度的一半
-      const maxAllowedWidth = Math.floor(bounds.width * 0.5);
-      if (this.sidebarWidth > maxAllowedWidth) {
-          this.sidebarWidth = maxAllowedWidth;
-      }
-
-      // 設置側邊欄邊界
-      if (this.currentView.sideWithMain.sidebar) {
-          this.currentView.sideWithMain.sidebar.setBounds({
-              x: 0,
-              y: 0,
-              width: this.sidebarWidth,
-              height: bounds.height
-          });
-      }
-
-      // 設置當前內容區邊界
-      if (this.currentView.sideWithMain.main) {
-          this.currentView.sideWithMain.main.setBounds({
-              x: this.sidebarWidth,
-              y: 0,
-              width: bounds.width - this.sidebarWidth,
-              height: bounds.height
-          });
-      }
+    // 設置側邊欄邊界
+    if (this.currentView.sideWithMain.sidebar) {
+      this.currentView.sideWithMain.sidebar.setBounds({
+        x: 0,
+        y: 0,
+        width: this.sidebarWidth.current,
+        height: bounds.height
+      });
     }
 
-
-
-    getMainWindow() {
-      return this.mainWindow;
-    }
-
-    getCurrentView() {
-      return this.viewState.current;
-    }
-
-    getSidebarWidth() {
-      return this.sidebarWidth;
-    }
-
-    // 切換側邊欄顯示/隱藏
-    toggleSidebar() {
-      if (this.viewState.sidebar) {
-        const isVisible = this.viewState.sidebar.getBounds().width > 0;
-        if (isVisible) {
-          this.setSidebarWidth(0);
-        } else {
-          this.setSidebarWidth(200);
-        }
-      }
-    }
-
-    closeAllWindows() {
-      if (this.mainWindow) {
-        this.mainWindow.close();
-      }
+    // 設置當前內容區邊界
+    if (this.currentView.sideWithMain.main) {
+      this.currentView.sideWithMain.main.setBounds({
+        x: this.sidebarWidth.current,
+        y: 0,
+        width: bounds.width - this.sidebarWidth.current,
+        height: bounds.height
+      });
     }
   }
+  //#endregion
+
+  //#region GET_PROPERTY_FUNCTION
+  getMainWindow() {
+    return this.mainWindow;
+  }
+
+  getCurrentView() {
+    return this.viewState.currentView;
+  }
+
+  getSidebarWidth() {
+    return this.sidebarWidth.current;
+  }
+  //#endregion
+
+
+}
 
 module.exports = WindowManager;

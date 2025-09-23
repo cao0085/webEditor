@@ -1,5 +1,7 @@
 // 項目更新
-window.electronAPI.onSidebarUpdate(updateCallback);
+if (window.electronAPI && window.electronAPI.subscribeSidebarUpdates) {
+    window.electronAPI.subscribeSidebarUpdates(updateCallback);
+}
 
 function updateCallback(data) {
   console.log('收到 sidebar 更新:', data);
@@ -55,9 +57,14 @@ function handleMouseMove(e) {
     const deltaX = e.clientX - startX;
     const newWidth = startWidth + deltaX;
 
+    // 限制寬度範圍
+    const minWidth = 150;
+    const maxWidth = 400;
+    const clampedWidth = Math.max(minWidth, Math.min(maxWidth, newWidth));
+
     // 通過 IPC 通知主進程調整寬度
     if (window.electronAPI && window.electronAPI.resizeSidebar) {
-        window.electronAPI.resizeSidebar(newWidth);
+        window.electronAPI.resizeSidebar(clampedWidth);
     }
 }
 

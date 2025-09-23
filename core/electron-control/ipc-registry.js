@@ -23,20 +23,11 @@ function registerAllIPC(windowManager) {
   // #endregion
 
   // #region 側邊欄相關 IPC
-  ipcMain.handle('switch-view', (event, webContentsID) => {
+  ipcMain.handle('switch-view', (event, webContentsId) => {
     try {
-      console.log('IPC switch-view:', webContentsID);
-      const result = windowManager.switchMainWCV(webContentsID);
-      
-      // 發送更新通知給渲染進程
-      if (windowManager.mainWindow) {
-        windowManager.mainWindow.webContents.send('sidebar-update', {
-          currentView: webContentsID,
-          timestamp: Date.now()
-        });
-      }
-      
-      return { success: true, currentView: webContentsID };
+      console.log('IPC switch-view:', webContentsId);
+      const isSuccess = windowManager.switchMainWCV(webContentsId);
+      return { success: isSuccess, currentView: webContentsId };
     } catch (error) {
       console.error('切換視圖失敗:', error);
       return { success: false, error: error.message };
@@ -66,15 +57,10 @@ function registerAllIPC(windowManager) {
 
   ipcMain.handle('get-sidebar-width', () => {
     try {
-      if (windowManager.getSidebarWidth) {
-        return windowManager.getSidebarWidth();
-      }
-      
-      // 返回預設寬度
-      return 200;
+      return windowManager.getSidebarWidth();
     } catch (error) {
-      console.error('獲取側邊欄寬度失敗:', error);
-      return 200; // 預設寬度
+      console.error('獲取側邊欄寬度失敗使用預設寬度200:', error);
+      return 200;
     }
   });
   // #endregion

@@ -17,8 +17,8 @@ const WCV_DEFAULT_SETTING = {
   },
 
   triggers: {
-    inSidebar: ['editor-1', 'previewer-1', 'previewer-2'],
-    inMenu: ['previewer-3'],
+    inSidebar: ['editor-1', 'previewer-1'],
+    inMenu: [],
   }
 }
 

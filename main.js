@@ -2,20 +2,44 @@ const { app, ipcMain } = require('electron');
 const WindowManager = require('./core/windowManager');
 const { WCV_DEFAULT_SETTING } = require('./client.config.js');
 const { registerAllIPC } = require('./core/electron-control/ipc-registry.js');
+const { validateAndThrow } = require('./core/validator/configValidator.js');
+const { isLoggedIn, createLoginWindow, logout } = require('./core/auth.js');
 
 let windowManager = null;
 
 app.whenReady().then(async () => {
-  console.log('App is ready, creating main window...');
+  createMainWindow();
+  // const loggedIn = await isLoggedIn();
+  // if (!loggedIn) {
+  //   createLoginWindow();
+  // } else {
+  //   createMainWindow();
+  // }
+});
+
+async function createMainWindow() {
+  console.log('Creating main window...');
   try {
+    validateAndThrow(WCV_DEFAULT_SETTING);
     windowManager = new WindowManager();
     const ipcUtils = registerAllIPC(windowManager);
     await windowManager.initialize(WCV_DEFAULT_SETTING);
     console.log('Application initialized successfully');
   } catch (error) {
-    console.error('Error creating main window:', error);
+    console.error('Error during initialization:', error);
     app.quit();
   }
+}
+
+ipcMain.on('login-success', async () => {
+  const Store = (await import('electron-store')).default;
+  const store = new Store();
+  store.set('isLoggedIn', true);
+
+  const loginWindows = require('electron').BrowserWindow.getAllWindows();
+  loginWindows.forEach(win => win.close());
+
+  createMainWindow();
 });
 
 app.on('window-all-closed', () => {
@@ -33,8 +57,11 @@ app.on('activate', () => {
 });
 
 // 應用程式即將退出
-app.on('before-quit', () => {
-  windowManager.closeAllWindows();
+app.on('before-quit', async () => {
+  await logout();
+  if (windowManager) {
+    windowManager.closeAllWindows();
+  }
 });
 
 // 錯誤處理

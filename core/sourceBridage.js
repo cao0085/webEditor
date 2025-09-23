@@ -1,4 +1,5 @@
 const path = require('path');
+const PRELOAD_PATH = path.join(__dirname, 'electron-control', 'preload.js')
 
 const SOURCE_TYPES = {
   LOCAL_HTML: 'html',
@@ -18,7 +19,7 @@ const WEBVIEW_SOURCE = {
     srcType: SOURCE_TYPES.LOCAL_HTML,
     path: path.join(__dirname, 'sidebar', 'sidebar.html'),
     name: 'sidebar',
-    preload: path.join(__dirname, 'electron-control', 'preload.js'),
+    preload: PRELOAD_PATH,
     singleton: true
   },
   
@@ -59,6 +60,7 @@ const WEBVIEW_SOURCE = {
 
 module.exports = {
   LAYOUT_MODE,
+  PRELOAD_PATH,
   SOURCE_TYPES,
   WEBVIEW_SOURCE
 };
