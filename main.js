@@ -5,6 +5,14 @@ const { registerAllIPC } = require('./core/electron-control/ipc-registry.js');
 const { validateAndThrow } = require('./core/validator/configValidator.js');
 const { isLoggedIn, createLoginWindow, logout } = require('./core/auth.js');
 
+// 引入 TypeScript 測試檔案（直接執行）
+try {
+  require('ts-node/register');
+  require('./core/test.ts');
+} catch (error) {
+  console.log('TypeScript test execution error:', error.message);
+}
+
 let windowManager = null;
 
 app.whenReady().then(async () => {

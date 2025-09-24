@@ -25,9 +25,8 @@ const WCV_DEFAULT_SETTING = {
 const CLIENT_ENV = {
   Account: "User00123",
   Password: "321321",
-  API: "/",
   Project: "./webProject/xxxxx",
-  Folder: "/"
+  StaticRoot: "/"
 };
 
 const DEPLOY_ENV = {
